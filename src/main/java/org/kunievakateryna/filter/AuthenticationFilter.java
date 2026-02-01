@@ -18,6 +18,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -28,6 +29,7 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
     private static final String PREFIX_OAUTH = "/oauth";
     private static final String ENDPOINT_AUTHENTICATE = PREFIX_OAUTH + "/authenticate";
     private static final String ENDPOINT_CALLBACK = PREFIX_OAUTH + "/callback";
+    public static final String COOKIE_REDIRECT_TO = "redirect-to";
     public static final String COOKIE_AUTH_STATE = "auth-state";
     public static final String COOKIE_SESSION_ID = "SESSION-ID";
 
@@ -47,7 +49,20 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
 
     private Mono<Void> authenticate(ServerWebExchange exchange) {
         String state = UUID.randomUUID().toString();
+        
+        String redirectTo = exchange.getRequest().getQueryParams()
+                .getOrDefault("redirectTo", List.of("/")).getFirst();
+
         addStateCookie(exchange, state);
+        
+        exchange.getResponse().addCookie(ResponseCookie.from(COOKIE_REDIRECT_TO)
+                .value(redirectTo)
+                .path(PREFIX_OAUTH)
+                .maxAge(Duration.of(30, ChronoUnit.MINUTES))
+                .secure(false) 
+                .httpOnly(true)
+                .build());
+
         String redirectUri = buildRedirectUri(exchange.getRequest());
         String authenticationUrl = googleAuthenticationService.generateAuthenticationUrl(redirectUri, state);
         return sendRedirect(exchange, authenticationUrl);
@@ -57,12 +72,15 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
         String code = exchange.getRequest().getQueryParams().getFirst("code");
         String state = exchange.getRequest().getQueryParams().getFirst("state");
         String redirectUri = buildRedirectUri(exchange.getRequest());
+
+        HttpCookie redirectCookie = exchange.getRequest().getCookies().getFirst(COOKIE_REDIRECT_TO);
+        String targetUrl = (redirectCookie != null) ? redirectCookie.getValue() : "/";
+
         return verifyState(state, exchange.getRequest())
                 .then(googleAuthenticationService.processAuthenticationCallback(code, redirectUri)
-                              .doOnNext(userInfo -> log.info("User authenticated: {}", userInfo))
                               .flatMap(sessionService::saveSession)
                               .flatMap(session -> sessionService.addSessionCookie(exchange, session))
-                              .then(sendRedirect(exchange, "/api/profile")));
+                              .then(sendRedirect(exchange, targetUrl)));
     }
 
     private Mono<Void> verifyState(String state, ServerHttpRequest request) {
