@@ -7,6 +7,7 @@ import org.kunievakateryna.service.UnauthorizedException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -27,6 +28,13 @@ public class ProfileController {
                 .onErrorResume(UnauthorizedException.class, e -> {
                     throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized access");
                 });
+    }
+
+    @PostMapping("/signout")
+    public Mono<Void> signout(ServerWebExchange exchange) {
+        return sessionService.checkSession(exchange)
+                .flatMap(session -> sessionService.deleteSession(session.getId()))
+                .then(sessionService.clearSessionCookie(exchange));
     }
 
     private Mono<UserInfo> toUserInfo(UserSession session) {

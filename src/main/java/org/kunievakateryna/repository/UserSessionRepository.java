@@ -34,4 +34,11 @@ public class UserSessionRepository {
                 UserSession.class);
     }
 
+    public Mono<Void> deleteById(String id) {
+        return entityTemplate.delete(
+                query(where("id").is(id)),
+                UserSession.class
+        ).then();
+    }
+
 }

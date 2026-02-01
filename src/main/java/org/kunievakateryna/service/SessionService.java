@@ -50,4 +50,18 @@ public class SessionService {
                                                                                 .build()));
     }
 
+    public Mono<Void> deleteSession(String sessionId) {
+        return userSessionRepository.deleteById(sessionId);
+    }
+
+    public Mono<Void> clearSessionCookie(ServerWebExchange exchange) {
+        return Mono.fromRunnable(() -> exchange.getResponse().addCookie(ResponseCookie.from(COOKIE_SESSION_ID)
+                                                 .value("")
+                                                 .path("/")
+                                                 .maxAge(0)
+                                                 .secure(false)
+                                                 .httpOnly(true)
+                                                 .build()));
+    }
+
 }
