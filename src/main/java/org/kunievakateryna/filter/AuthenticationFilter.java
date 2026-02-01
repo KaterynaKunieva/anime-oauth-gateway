@@ -65,9 +65,9 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
     }
 
     private Mono<Void> verifyState(String state, ServerHttpRequest request) {
-        String cookieState = request.getCookies().getFirst(COOKIE_AUTH_STATE).getValue();
-        if (!state.equals(cookieState)) {
-            return Mono.error(new IllegalStateException("Invalid state"));
+        HttpCookie cookie = request.getCookies().getFirst(COOKIE_AUTH_STATE);
+        if (cookie == null || !state.equals(cookie.getValue())) {
+            return Mono.error(new IllegalStateException("Invalid state or cookie missing"));
         }
         return Mono.empty();
     }
@@ -77,7 +77,7 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
                                                  .value(state)
                                                  .path(PREFIX_OAUTH)
                                                  .maxAge(Duration.of(30, ChronoUnit.MINUTES))
-                                                 .secure(true)
+                                                 .secure(false)
                                                  .build());
     }
 
