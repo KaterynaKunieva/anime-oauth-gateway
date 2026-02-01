@@ -1,0 +1,65 @@
+server:
+  port: 8080
+  error:
+    include-message: always
+    include-binding-errors: always
+
+oauth:
+  google:
+    clientId: "${GOOGLE_CLIENT_ID}"
+    clientSecret: "${GOOGLE_CLIENT_SECRET}"
+    scope: "openid profile email"
+
+spring:
+  application:
+    name: anime-oauth-gateway
+
+  cloud:
+    consul:
+      enabled: false
+      config:
+        enabled: false
+    gateway:
+      routes:
+        - id: gateway-oauth-route
+          uri: "lb://anime-oauth-gateway"
+          predicates:
+            - Path=/oauth/**
+
+        - id: anime-api-route
+          uri: http://anime-api-service:8080
+          predicates:
+            - Path=/api/anime/**, /api/author/**
+
+        - id: episode-api-route
+          uri: http://episode-api-service:3000
+          predicates:
+            - Path=/api/episode/**
+
+  r2dbc:
+    url: "r2dbc:h2:mem:///gwsdb"
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      services:
+        wait-duration-in-open-state: 10s
+        failure-rate-threshold: 60
+        slow-call-duration-threshold:
+          - 2s
+        minimum-number-of-calls: 3
+        permitted-number-of-calls-in-half-open-state: 1
+
+management:
+  endpoint:
+    health:
+      show-details: always
+  endpoints:
+    web:
+      base-path: /
+      exposure:
+        include: "*"
